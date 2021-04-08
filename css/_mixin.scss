@@ -1,0 +1,16 @@
+// clear: both、 hide-text
+@mixin hide-text {
+  text-indent: 101%;
+  overflow: hidden;
+  white-space: nowrap;
+}
+@mixin clearfix {
+  &::before,
+  &::after {
+    content: '';
+    display: block;
+  }
+  &::after {
+    clear: both;
+  }
+}
