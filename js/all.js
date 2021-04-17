@@ -4,8 +4,8 @@
 // 點選送出預訂資料 => 送出購買訂單api OK
 
 // 代入自己的網址路徑
-const api_path = 'hsinhui';
-const token = 'h3Vxb7Y0dZbtSXddEsCH5ZY3omb2';
+const api = 'https://hexschoollivejs.herokuapp.com/api/livejs/v1/customer';
+const apiPath = 'hsinhui';
 // 取得網頁DOM
 const productListEl = document.querySelector('.product-list');
 const cartBtn = document.querySelector('.cart-btn');
@@ -34,14 +34,14 @@ init();
 // 取得產品列表
 function getProductList() {
   axios
-    .get(`https://hexschoollivejs.herokuapp.com/api/livejs/v1/customer/${api_path}/products`)
+    .get(`${api}/${apiPath}/products`)
     .then(function (response) {
       productList = response.data.products;
       renderProductList('全部'); //預設載入全部資料
     })
     .catch(function (err) {
       console.log(err);
-      alert('目前網頁怪怪的，工程師全力修復中');
+      Swal.fire('目前網頁怪怪的，工程師全力修復中');
     });
 }
 
@@ -60,8 +60,8 @@ function renderProductList(category) {
     <a href="#" data-id=${item.id} class="cart-btn">加入購物車</a>
     <div class="item-info">
       <p class="item-name">${item.title}</p>
-      <p class="normal-price">NT$${item.origin_price}</p>
-      <p class="sale-price">NT$${item.price}</p>
+      <p class="normal-price">NT$${thousandsComma(item.origin_price)}</p>
+      <p class="sale-price">NT$${thousandsComma(item.price)}</p>
     </div>
     <div class="mark">新品</div>
   </li>`;
@@ -95,24 +95,25 @@ function addCartItem(cartId) {
     }
   });
   axios
-    .post(`https://hexschoollivejs.herokuapp.com/api/livejs/v1/customer/${api_path}/carts`, {
+    .post(`${api}/${apiPath}/carts`, {
       data: {
         productId: cartId,
         quantity: itemNum
       }
     })
     .then(function (response) {
+      Swal.fire('加入購物車成功');
       getCartList();
     })
     .catch(function (err) {
       console.log(err);
-      alert('庫存量不足，我們會盡快補貨><');
+      Swal.fire('庫存量不足，我們會盡快補貨><');
     });
 }
 // 取得購物車列表
 function getCartList() {
   axios
-    .get(`https://hexschoollivejs.herokuapp.com/api/livejs/v1/customer/${api_path}/carts`)
+    .get(`${api}/${apiPath}/carts`)
     .then(function (response) {
       cartItem = response.data.carts;
       totalPrice = response.data.finalTotal;
@@ -120,7 +121,7 @@ function getCartList() {
     })
     .catch(function (err) {
       console.log(err);
-      alert('目前網頁怪怪的，工程師全力修復中');
+      Swal.fire('目前網頁怪怪的，工程師全力修復中');
     });
 }
 
@@ -133,51 +134,118 @@ function renderCartList() {
       <img src="${item.product.images}" alt="" />
       <p class="item-name">${item.product.title}</p>
     </td>
-    <td>NT$${item.product.origin_price}</td>
-    <td>${item.quantity}</td>
-    <td>NT$${item.product.price}</td>
+    <td>NT$${thousandsComma(item.product.price)}</td>
+    <td><a href="#"><i class="fas fa-minus js-reduce" data-reduce=${item.id},${item.quantity}></i></a>
+     ${item.quantity} <a href="#"><i class="fas fa-plus js-increment" data-increment=${item.id},${
+      item.quantity
+    }></i></a> </td>
+    <td>NT$${thousandsComma(item.product.price * item.quantity)}</td>
     <td>
-      <a href="#"  ><i class="fas fa-times" data-num=${item.id}></i></a>
+      <a href="#" ><i class="fas fa-times js-delete" data-num=${item.id}></i></a>
     </td>
   </tr>`;
   });
   boughtItem.innerHTML = str;
-  totalPriceEl.textContent = `NT$${totalPrice}`;
+  totalPriceEl.textContent = `NT$${thousandsComma(totalPrice)}`;
+}
+// 更改購物車內產品數量
+boughtItem.addEventListener('click', boughtItemFunction);
+function patchCartItem(cartId, num) {
+  axios
+    .patch(`${api}/${apiPath}/carts`, {
+      data: {
+        id: cartId,
+        quantity: num
+      }
+    })
+    .then(function () {
+      getCartList();
+    })
+    .catch(function (err) {
+      console.log(err);
+    });
+}
+// 將購物車監聽都放在此函示
+function boughtItemFunction(e) {
+  e.preventDefault();
+  let value = '';
+  let target = e.target.getAttribute('class');
+  //target若是null就給null，若有值(有class)，則用空白隔開兩個class並將最後一個class拔出來賦予在value上
+  target === null ? null : (value = target.split(' ').pop());
+  switch (value) {
+    case 'js-increment':
+      // 將data-increment裡的兩個值用逗號隔開回傳陣列
+      let incrementData = e.target.dataset.increment.split(',');
+      // 目前的產品數量 +1 => 想更改成的產品數量
+      let incrementNum = Number(incrementData[1]) + 1;
+      patchCartItem(incrementData[0], incrementNum);
+      break;
+    case 'js-reduce':
+      let reduceData = e.target.dataset.reduce.split(',');
+      let reduceNum = Number(reduceData[1]) - 1;
+      if (reduceNum === 0) {
+        alert('商品數量不能小於0');
+        return;
+      }
+      patchCartItem(reduceData[0], reduceNum);
+      break;
+    case 'js-delete':
+      let cartId = e.target.dataset.num;
+      deleteCartItem(cartId);
+    default:
+      break;
+  }
 }
 
 // 清除購物車內全部產品
 deleteAllBtn.addEventListener('click', deleteAllCartList);
 function deleteAllCartList() {
-  axios
-    .delete(`https://hexschoollivejs.herokuapp.com/api/livejs/v1/customer/${api_path}/carts`)
-    .then(function (response) {
-      getCartList();
-    })
-    .catch(function (err) {
-      console.log(err);
-    });
-}
-// 刪除購物車選擇產品
-boughtItem.addEventListener('click', deleteItem);
-function deleteCartItem(cartId) {
-  axios
-    .delete(`https://hexschoollivejs.herokuapp.com/api/livejs/v1/customer/${api_path}/carts/${cartId}`)
-    .then(function (response) {
-      // console.log(response.data);
-      getCartList();
-    })
-    .catch(function (err) {
-      console.log(err);
-      alert('購物車已經沒有東西了QQ');
-    });
-}
-function deleteItem(e) {
-  e.preventDefault();
-  if (e.target.nodeName !== 'I') {
+  if (cartItem.length === 0) {
+    Swal.fire('購物車已經沒有東西了QQ');
     return;
   }
-  let cartId = e.target.dataset.num;
-  deleteCartItem(cartId);
+  Swal.fire({
+    title: '確定要清空購物車嗎?',
+    showCancelButton: true,
+    cancelButtonText: `取消`,
+    confirmButtonText: `確定`
+  }).then((result) => {
+    if (result.isConfirmed) {
+      Swal.fire('成功清空購物車!', '', 'success');
+      axios
+        .delete(`${api}/${apiPath}/carts`)
+        .then(function (response) {
+          getCartList();
+        })
+        .catch(function (err) {
+          console.log(err);
+        });
+    }
+  });
+}
+// 刪除購物車選擇產品
+boughtItem.addEventListener('click', boughtItemFunction);
+function deleteCartItem(cartId) {
+  Swal.fire({
+    title: '確定移除此產品?',
+    showCancelButton: true,
+    cancelButtonText: `取消`,
+    confirmButtonText: `確定`
+  }).then((result) => {
+    if (result.isConfirmed) {
+      Swal.fire('成功移除!', '', 'success');
+      axios
+        .delete(`${api}/${apiPath}/carts/${cartId}`)
+        .then(function (response) {
+          // console.log(response.data);
+          getCartList();
+        })
+        .catch(function (err) {
+          console.log(err);
+          Swal.fire('產品刪除失敗!');
+        });
+    }
+  });
 }
 //表單驗證
 let errors;
@@ -193,62 +261,59 @@ function formValidate() {
     },
     電話: {
       presence: {
-        message: '必填'
+        message: '必填!'
       },
-      type: {
-        type: 'number',
+      format: {
+        pattern: /^[09]{2}\d{8}$/, //手機驗證表達式
         message: '請輸入正確格式'
       }
+      // numericality: {
+      //   onlyInteger: true,
+      //   message: '請輸入正確格式'
+      // }
     },
     email: {
       email: {
         message: '請輸入正確格式'
       },
       presence: {
-        message: '必填'
+        message: '必填!'
       }
     },
     寄送地址: {
       presence: {
-        message: '必填'
+        message: '必填!'
       }
     }
   };
-
   submitBtn.addEventListener('click', checkValidate);
   function checkValidate() {
     inputs.forEach((item) => {
+      // 每次驗證前先清空提醒文字，這樣後來正確驗證後提醒文字才會不見
       item.nextElementSibling.textContent = '';
-      if (item.value == '') {
-        errors = validate(form, constraints);
-        // console.log(errors);
-        if (errors) {
-          //如果有錯誤訊息(有表單不符規定)
-          Object.keys(errors).forEach(function (keys) {
-            //選取相對應的input、select、textarea
-            const keyName = document.querySelector(`input[name='${keys}']`);
-            //所有選取元素的下一個同層輸入相對應的錯誤訊息
-            keyName.nextElementSibling.textContent = errors[keys];
-          });
-        }
+      errors = validate(form, constraints);
+      if (errors) {
+        //如果有錯誤訊息(有表單不符規定)
+        Object.keys(errors).forEach(function (keys) {
+          //選取相對應的input、select、textarea
+          const keyName = document.querySelector(`input[name='${keys}']`);
+          //所有選取元素的下一個同層輸入相對應的錯誤訊息
+          keyName.nextElementSibling.textContent = errors[keys];
+        });
       }
     });
+    createOrder();
   }
 }
 // 送出購買訂單
-submitBtn.addEventListener('click', createOrder);
-function createOrderCheck() {
-  if (errors || cartItem == []) {
-    return;
-  }
-  createOrder();
-}
 function createOrder() {
-  if (errors || cartItem == []) {
+  // 如購物車沒東西，或表單驗證有錯誤就不執行
+  if (cartItem.length === 0 || errors) {
+    Swal.fire('購物車可能沒東西或是資料填寫不完整');
     return;
   }
   axios
-    .post(`https://hexschoollivejs.herokuapp.com/api/livejs/v1/customer/${api_path}/orders`, {
+    .post(`${api}/${apiPath}/orders`, {
       data: {
         user: {
           name: inputs[0].value,
@@ -260,11 +325,19 @@ function createOrder() {
       }
     })
     .then(function (response) {
-      alert('已成功送出訂單!');
+      Swal.fire('成功送出訂單!');
+      form.reset();
+      // 送出訂單會自動清空購物車，因此重新渲染購物車就OK
+      getCartList();
     })
     .catch(function (err) {
       console.log(err);
     });
-  form.reset();
-  deleteAllCartList();
+}
+
+// utilities 工具類function 實務操作可能會單獨一隻檔案
+function thousandsComma(num) {
+  let parts = num.toString().split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return parts.join('.');
 }
